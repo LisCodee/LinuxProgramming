@@ -24,6 +24,7 @@ int twakeup(int event){
         if(p->event == event){
             p->status = READY;
             enqueue(&readyQueue, p);
+            printList("readyQueue", readyQueue);
             ++flag;
         }
         else
@@ -59,7 +60,7 @@ int join(int pid, int *status){
                return -1;
            }
            running->joinPid = pid;
-           running->joinPtr = &proc[i];
+           running->joinPtr = proc;
            if(proc->status == ZOMBIE){
                *status = proc->exitStatus;
                proc->status = FREE;
@@ -68,6 +69,7 @@ int join(int pid, int *status){
            }
            //sleep on target pid
            tsleep(pid);
+           printList("sleepList:", sleepList);
         }
         enqueue(&readyQueue, proc);
     }
@@ -107,11 +109,7 @@ void task1(void *parm){     //task1:demonstrate create-join operations
     for(i = 0; i< 2; ++i)
         pid[i] = create(func, running->pid);
     join(5, &status);       //try to join with targetPid=5
-    for(i = 0;i < 2;++i){
-        //try to join with p2 p3
-        pid[i] = join(pid[i], &status);
-        printf("task %d joined with task%d: status=%d\n", running->pid, pid[i], status);
-    }
+    join(2, &status);
 }
 
 int do_create(){
@@ -141,6 +139,8 @@ void func(void *param){
     while(1){
         printf("task %d running\n", running->pid);
         printList("readyQueue:", readyQueue);
+        printList("sleepList:", sleepList);
+        printList("freeList:", freeList);
         printf("enter a key [c|s|q|j]: ");
         c = getchar();getchar();
         switch(c){
