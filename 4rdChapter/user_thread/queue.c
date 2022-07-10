@@ -20,6 +20,16 @@ PROC* dequeue(PROC **queue){
     return q;
 }
 
+int len(PROC *queue){
+    int length = 0;
+    PROC *t = queue;
+    while(t){
+        ++length;
+        t = t->next;
+    }
+    return length;
+}
+
 int printList(char *name, PROC *p){
     printf("%s = ", name);
     while(p){

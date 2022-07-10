@@ -9,11 +9,72 @@ PROC *readyQueue;
 PROC *sleepList;
 PROC *running;
 
-int tsleep(int event){}
-int twakeup(int event){}
-int texit(int status){}
-int join(int pid, int *status){}
-
+int tsleep(int event){
+    running->event = event;
+    running->status = SLEEP;
+    enqueue(&sleepList, running);
+    tswitch();
+}
+// wake up threads sleep on event, and return the num of wake up threads;
+int twakeup(int event){
+    PROC *p = dequeue(&sleepList);
+    int l = len(sleepList), flag = 0;
+    printf("there are %d threads in sleepList\n", l);
+    while(l>0 && p){
+        if(p->event == event){
+            p->status = READY;
+            enqueue(&readyQueue, p);
+            ++flag;
+        }
+        else
+            enqueue(&sleepList, p);
+        p = dequeue(&sleepList);
+        --l;
+    }
+    return flag;
+}
+//exit the thread with status, if this thread have some threads join with it, wake up them then become a ZOMBIE;
+int texit(int status){
+    //try to find any task which wants to join with this task;
+    //if no task wants to join with this task,exit as free
+    running->status = ZOMBIE;
+    running->exitStatus = status;
+    int f = twakeup(running->pid);
+    if(0 == f){
+        running->status = FREE;
+        enqueue(&freeList, running);
+    }
+    //give up cpu
+    tswitch();
+}
+int join(int pid, int *status){
+    printf("task %d try to join with %d:", running->pid, pid);
+    int i, length=len(readyQueue);
+    PROC *proc;
+    for(i = 0;i < length;i++){
+        proc = dequeue(&readyQueue); 
+        if(proc->pid == pid){
+           if(proc->joinPid == running->pid){
+               printf("DEADLOCK ERROR!\n");
+               return -1;
+           }
+           running->joinPid = pid;
+           running->joinPtr = &proc[i];
+           if(proc->status == ZOMBIE){
+               *status = proc->exitStatus;
+               proc->status = FREE;
+               enqueue(&freeList, proc);
+               return proc->pid;
+           }
+           //sleep on target pid
+           tsleep(pid);
+        }
+        enqueue(&readyQueue, proc);
+    }
+    printf("no thread id = %d\n", pid);
+    return -1;
+}
+int create(void (*f)(), void *parm);
 void func(void *param);
 int init(){
     int i, j;
@@ -63,6 +124,15 @@ int do_switch(){
 
 int do_exit(){
     texit(running->pid);
+}
+
+int do_join(){
+    int targetPid, status;
+    printf("input a number that you want to join:");
+    scanf("%d",&targetPid);
+    int ret = join(targetPid, &status);
+    printf("join exit with:%d\n", ret);
+    return ret;
 }
 
 void func(void *param){
