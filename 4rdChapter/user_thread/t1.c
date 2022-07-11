@@ -9,6 +9,49 @@ PROC *readyQueue;
 PROC *sleepList;
 PROC *running;
 
+typedef struct mutex{
+    int lock;               //mutex lock state:0 for unlock, 1 for lock;
+    PROC* owner;
+    PROC* queue;
+}MUTEX;
+
+MUTEX* mutex_create(){
+    MUTEX *mp = (MUTEX*)malloc(sizeof(MUTEX));
+    mp->lock = mp->owner = mp->queue;
+    return mp;
+}
+
+void mutex_destory(MUTEX* mp){
+    free(mp);
+}
+
+int mutex_lock(MUTEX* mp){
+    if(mp->lock == 0){
+        mp->lock = 1;
+        mp->owner = running;
+        return 0;
+    }else{
+        running->status = SLEEP;
+        enqueue(mp->queue, running);
+        tswitch();
+        return 1;
+    }
+}
+
+int mutex_unlock(MUTEX* mp){
+    if(mp->lock == 0 || (mp->lock == 1 && mp->owner != running)
+        return -1;
+    if(!queue){
+        mp->lock = 0;
+        mp->owner = 0;
+    }else{
+        PROC *p = dequeue(mp->queue);
+        mp->owner = p;
+        enqueue(&readyQueue, p);
+    }
+    return 0;
+}
+
 int tsleep(int event){
     running->event = event;
     running->status = SLEEP;
