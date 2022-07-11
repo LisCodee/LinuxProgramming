@@ -17,8 +17,8 @@ int tsleep(int event){
 }
 // wake up threads sleep on event, and return the num of wake up threads;
 int twakeup(int event){
-    PROC *p = dequeue(&sleepList);
     int l = len(sleepList), flag = 0;
+    PROC *p = dequeue(&sleepList);
     printf("there are %d threads in sleepList\n", l);
     while(l>0 && p){
         if(p->event == event){
@@ -67,6 +67,7 @@ int join(int pid, int *status){
                enqueue(&freeList, proc);
                return proc->pid;
            }
+           enqueue(&readyQueue, proc);
            //sleep on target pid
            tsleep(pid);
            printList("sleepList:", sleepList);
