@@ -542,5 +542,76 @@ flags包括：
 
 如果未指定任何标志寄存器，子进程会获得一套单独的资源副本。
 
-## 4.4 用户级线程
+
+
+# 第五章 定时器及时钟服务
+
+
+
+定时器是由时钟源和可编程计数器组成的硬件设备。时钟源通常是一个晶体振荡器，会产生周期性电信号，以精确的评率驱动计数器。使用一个倒计时值对计数器进行编程，每个时钟信号减一，当计数器减为零时，向CPU生成一个定时器中断，并将计数器值重新加载到计数器中，重复计时。计数器周期称为定时器刻度，是系统的基本及时单元。
+
+## 5.1 个人计算机定时器
+
+- 实时时钟RTC：有一个小型备用电池供电，即使关机时页能继续运行。用于实时提供时间和日期信息。在所有类Unix系统中，时间是一个长整数，为从1970年1月1日经过的秒数。
+- 可编程间隔定时器PIT:与CPU分离的一个硬件定时器。可对他进行编程，以提供以毫秒为单位的定时器刻度。在所有IO设备中，PIT可以最高优先级IRQ0中断。PIT定时器中断由Linux内核的定时器中断处理程序来处理，为操作系统提供基本的定时单元，如进程调度、进程间隔定时器和其他许多定时事件。
+- 多核CPU中的本地定时器：在多核CPU中，每个核都是一个独立的处理器，有自己的本地定时器，由CPU时钟驱动
+- 高分辨率定时器：大多数电脑都有一个时间戳定时器(TSC)，有系统时钟驱动，它的内容可通过64位TSC寄存器读取。由于不同系统主板的时钟频率可能不同，TSC不适合作为实时设备，**但他可提供纳秒级的定时器分辨率。**
+
+## 5.2 中断处理
+
+外部设备的中断被馈送到**中断控制器**的预定义输入行，按优先级对中断输入进行排序，并将具有最高优先级的中断作为中断请求IRQ路由到CPU。对于每个中断，可以编程中断控制器来生成一个唯一编号，叫中断向量，标识中断源。在获取中断向量之后，CPU用它作为内存中中断向量表的条目索引，条目包含一个指向中断处理程序入口地址的指针来实际处理中断。当中断处理结束时，CPU恢复指令正常执行。
+
+## 5.3 时钟服务函数
+
+- gettimeofday
+- settimeofday
+
+### 5.3.1 time系统调用
+
+- time_t time(time_t *t):以秒为单位返回当前时间。t为传出参数，只能提供以秒为单位的分辨率。
+
+### 5.3.2 times系统调用
+
+- clock_t times(struct  tms *buf):buf为传出参数，可用于获取某进程的具体执行时间。
+
+```C
+struct tms{
+    clock_t tms_utime;		//user mode time
+    clock_t tms_sutime;		//system mode time
+    clock_t tms_cutime;		//user time for child
+    clock_t tms_cstime;		//system time for child
+}
+```
+
+### 5.3.3 time和date
+
+- date：打印或设置系统日期
+- time：报告进程在用户模式和系统模式下执行时间的总和
+- hwclock：查询并设置硬件时钟(RTC)，也可以通过BIOS完成
+
+## 5.6 间隔定时器
+
+Linux为每个进程提供了三种不同类型的间隔计时器，可以用作进程计时的虚拟时钟。间隔定时器用setitimer创建，getitimer返回定时器状态。
+
+- ITIMER_REAL:实时减少，到期生成14信号
+- ITIMER_VIRTUAL：仅在进程在用户模式下减少，到期生成26信号
+- ITIMER_PROF：当进程正在用户模式和系统模式时减少，到期生成27信号。
+
+```c
+       #include <sys/time.h>
+           struct itimerval {
+               struct timeval it_interval; /* Interval for periodic timer */
+               struct timeval it_value;    /* Time until next expiration */
+           };
+
+           struct timeval {
+               time_t      tv_sec;         /* seconds */
+               suseconds_t tv_usec;        /* microseconds */
+           };
+       int getitimer(int which, struct itimerval *curr_value);
+       int setitimer(int which, const struct itimerval *new_value,
+                     struct itimerval *old_value);
+```
+
+
 
