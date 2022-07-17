@@ -697,3 +697,32 @@ Linux不区分线程和进程。
 # 第七章 文件操作
 
 ## 7.1 文件操作级别
+文件操作分为五个级别：
+- 硬件级别：
+    - fdisk：将硬盘、U盘或者SDC盘分区
+    - mkfs：格式化磁盘分区，为系统做好准备
+    - fsck：检查和维修系统
+    - 碎片整理：压缩文件系统中的文件
+
+- 内核中的文件系统函数：
+    - kmount(), kumount()
+    - kmkdir(), krmdir()
+    - kchdir(), kgetcwd()
+    - klink(), kunlink()
+    - kchmod(), kchown(), kutime()
+    - kcreat(), kopen()
+    - kread(), kwrite()
+    - klseek(), kclose()
+    - ksymlink(), kreadlink()
+    - kstat(), kfstat(), klstat()
+    - kopendir(), kreaddir()
+
+- 系统调用：用户模式使用系统调用来访问内核函数。
+
+- IO库函数：系统调用只会读/写一系列字节，用户通常需要读/写字符、行记录或数据结构等。C库提供了一系列标准函数：
+    - FILE mode I/O:fopen(), fread(), fwrite(), fseek(), fclose(), fflush()
+    - char mode I/O:getc(), getchar(), ugetc(), putc(), putchar()
+    - line mode I/O: gets(), fgets(), puts(), fputs()
+    - formatted I/O: scanf(), fscanf(), sscanf();printf(), fprintf(), sprintf()
+除了读写内存位置的sscanf()和sprintf()外，其他的IO函数都是建立在系统调用之上。
+
