@@ -8,6 +8,8 @@
 #include<errno.h>
 #include<sys/stat.h>
 
+#include "utils.h"
+
 #define LEN 1024
 #define SERVER_HOST "127.0.0.1"
 #define SERVER_PORT 1209
@@ -39,14 +41,6 @@ void initServer()
     printf("===================init done========================\n");
 }
 
-void printError()
-{
-    if(errno != 0)
-    {
-        printf("ERRNO:%d, ERR:%s\n", errno, strerror(errno));
-        exit(-1);
-    }
-}
 
 int execute(char* command, char* res, int len)
 {
@@ -55,30 +49,37 @@ int execute(char* command, char* res, int len)
     token = strtok(command, " ");
     strcpy(cmd, token);
     printf("command is [%s]\n", cmd);
+    printf("%d\n", strcmp(cmd, "pwd"));
     if(!strcmp(cmd, "pwd"))
     {
+        printf("command is [%s]\n", cmd);
         getcwd(res, len);
         return 0;
     }
     if(!strcmp(cmd, "mkdir"))
     {
+        printf("command is [%s]\n", cmd);
         token = strtok(NULL, " ");
+        if(token == NULL)
+            return -1;
         strcpy(param, token);
         printf("mkdir's param is %s\n", param);
         mkdir(param, 0755);
         strcpy(res, "mkdir success\n");
         return 0;
     }
+    return -1;
 }
 
 int main(int argc, char* argv[])
 {
     char cmd[LEN];
     initServer();
-    printf("=================ssh server listening...===================\n");
     while(1)
     {
-       cSock = accept(mySock, (struct sockaddr*)&cAddr, (socklen_t*)(sizeof(cAddr)));
+       printf("=================ssh server listening...===================\n");
+       int len = sizeof(cAddr);
+       cSock = accept(mySock, (struct sockaddr*)&cAddr, &len);
        if(cSock == -1)
            printError();
        printf("connect to client:%s, port:%d\n", inet_ntoa(cAddr.sin_addr.s_addr), ntohs(cAddr.sin_port));
@@ -101,8 +102,13 @@ int main(int argc, char* argv[])
                    printf("execute result is: %s\n", output);
                    //write res to client
                    write(cSock, output, LEN);
-                   printf("wating for next request\n");
+               }else
+               {
+                   printf(" cmd error\n");
+                   strcpy(output, "command error, try agagin\n");
+                   write(cSock, output, LEN);
                }
+               printf("wating for next request\n");
            }
        }
     }
