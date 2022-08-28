@@ -20,6 +20,8 @@ void initServer();
 
 struct sockaddr_in myAddr, cAddr;
 int mySock, cSock;
+char root[] = "/home/xpt/Linux/13thChapter/SSH";
+char cwd[LEN] = "/home/xpt/Linux/13thChapter/SSH";
 
 void initServer()
 {
@@ -41,32 +43,169 @@ void initServer()
     printf("===================init done========================\n");
 }
 
-
-int execute(char* command, char* res, int len)
+int parseCmd(const char* command, char* c, char* p)
 {
-    char cmd[16], param[256];
-    char* token;
-    token = strtok(command, " ");
-    strcpy(cmd, token);
+    char* cmd = (char*)malloc(sizeof(command));
+    strcpy(cmd, command);
+    char* token = strtok(cmd, " ");
+    if(token == NULL)
+        strcpy(c, command);
+    strcpy(c, token);
+    token = strtok(NULL, " ");
+    if(token != NULL)
+        strcpy(p, token);
+    else
+        p = NULL;
+    return 0;
+}
+
+int parsePath(char* path, char* prefix, char* basename)
+{
+    char* token = strrchr(path, (int) '/');
+    if(token == NULL)
+    {
+        strcpy(prefix, "");
+        strcpy(basename, path);
+        return 1;
+    }
+    strcpy(basename, token+1);
+    *token = '\0';
+    strcpy(prefix, path);
+    return 0;
+}
+
+int makeDir(char* path)
+{
+    char prefix[LEN], basename[LEN], destPath[2*LEN];
+    if(parsePath(path, prefix, basename) == 1)
+    {
+        strcpy(destPath, cwd);
+    }else{
+        if(strstr(prefix, root) == NULL)
+            return -1;
+        strcpy(destPath, prefix);
+    }
+    strcat(destPath, "/");
+    strcat(destPath, basename);
+    printf("prefix is [%s], basename is [%s]\n", prefix, basename);
+    if(mkdir(destPath, 0755) == -1)
+        return -2;
+    return 0;
+}
+
+int rm(char* path)
+{
+    char prefix[LEN], basename[LEN], destPath[2*LEN];
+    if(parsePath(path, prefix, basename) == 1)
+        strcpy(destPath, cwd);
+    else
+    {
+        if(strstr(prefix, root) == NULL)
+            return -1;
+        strcpy(destPath, prefix);
+    }
+    strcat(destPath, "/");
+    strcat(destPath, basename);
+    struct stat s;
+    if(stat(destPath, &s) == -1)
+    {
+        return -2;
+    }
+    if(S_ISDIR(s.st_mode))
+        if(rmdir(destPath) == -1)
+            return -2;
+    if(S_ISREG(s.st_mode))
+        if(unlink(destPath) == -1)
+            return -2;
+    return 0;
+}
+
+int changeDir(char* path)
+{
+    char prefix[LEN], basename[LEN], destPath[2*LEN];
+    printf("DEBUG:path is:%s\n", path);
+    if(!strcmp(path, "."))
+        return 0;
+    if(!strcmp(path, ".."))
+    {
+        if(!strcmp(root, cwd))  //if cwd == root, permission deined
+            return -1;
+        else
+        {
+            char* idx = rindex(cwd, (int) '/');
+            *idx = '\0';
+            return 0;
+        }
+    }
+    if(parsePath(path, prefix, basename) == 1)
+        strcpy(destPath, cwd);
+    else
+    {
+        if(strstr(prefix, root) == NULL)
+            return -1;  //permission deined
+        strcpy(destPath, prefix);
+    }
+    strcat(destPath, "/");
+    strcat(destPath, basename);
+    printf("DEBUG:prefix:%s,basename:%s, destPath:%s\n", prefix, basename, destPath);
+    struct stat s;
+    if(stat(destPath, &s) == -1)
+        return -2;      //syscall error
+    if(S_ISDIR(s.st_mode))
+    {
+        strcpy(cwd, destPath);
+        return 0;
+    }
+    else
+        return -3;      //no such dir
+}
+
+int execute(const char* command, char* res, int len)
+{
+    char cmd[16], param[LEN];
+    parseCmd(command, cmd, param);
     printf("command is [%s]\n", cmd);
-    printf("%d\n", strcmp(cmd, "pwd"));
     if(!strcmp(cmd, "pwd"))
     {
-        printf("command is [%s]\n", cmd);
-        getcwd(res, len);
+        strcpy(res, cwd);
         return 0;
     }
     if(!strcmp(cmd, "mkdir"))
     {
-        printf("command is [%s]\n", cmd);
-        token = strtok(NULL, " ");
-        if(token == NULL)
-            return -1;
-        strcpy(param, token);
-        printf("mkdir's param is %s\n", param);
-        mkdir(param, 0755);
-        strcpy(res, "mkdir success\n");
+        int r = makeDir(param);
+        if(r == -1)
+            strcpy(res, "Permission deined!\n");
+        if(r == -2)
+            strcpy(res, strerror(errno));
+        if(r == 0)
+            strcpy(res, "success\n");
         return 0;
+            
+    }
+    if(!strcmp(cmd, "rm"))
+    {
+        int r = rm(param);
+        if(r == -1)
+            strcpy(res, "permission deined!\n");
+        if(r == -2)
+            strcpy(res, strerror(errno));
+        if(r == 0)
+            strcpy(res, "success\n");
+        return 0;
+    }
+    if(!strcmp(cmd, "cd"))
+    {
+       int r = changeDir(param);
+       if(r == -1)
+            strcpy(res, "permission deined!\n");
+       if(r == -2)
+            strcpy(res, strerror(errno));
+       if(r == -3)
+            strcpy(res, "No such dir\n"); 
+       if(r == 0)
+            strcpy(res, "success\n");
+       printf("cwd:%s\n", cwd);
+       return 0;
     }
     return -1;
 }

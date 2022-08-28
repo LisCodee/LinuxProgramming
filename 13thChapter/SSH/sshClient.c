@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
         n = read(mySock, res, LEN);
         if(n <= 0)
             continue;
-        printf("get %d byte from server:[%s]\n", LEN, res);
+        printf("get %d byte from server:%s\n", LEN, res);
     }
     return 0;
 }
