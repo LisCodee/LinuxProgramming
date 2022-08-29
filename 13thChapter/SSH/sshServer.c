@@ -7,6 +7,8 @@
 #include<netdb.h>
 #include<errno.h>
 #include<sys/stat.h>
+#include<dirent.h>
+#include<fcntl.h>
 
 #include "utils.h"
 
@@ -16,7 +18,8 @@
 #define LISTEN_BACKLOG 512
 
 void printError();
-void initServer();
+int parseCmd(const char* command, char* c, char* p);
+int parsePath(const char* path, char* prefix, char* basename);
 
 struct sockaddr_in myAddr, cAddr;
 int mySock, cSock;
@@ -43,35 +46,49 @@ void initServer()
     printf("===================init done========================\n");
 }
 
-int parseCmd(const char* command, char* c, char* p)
-{
-    char* cmd = (char*)malloc(sizeof(command));
-    strcpy(cmd, command);
-    char* token = strtok(cmd, " ");
-    if(token == NULL)
-        strcpy(c, command);
-    strcpy(c, token);
-    token = strtok(NULL, " ");
-    if(token != NULL)
-        strcpy(p, token);
-    else
-        p = NULL;
-    return 0;
-}
-
-int parsePath(char* path, char* prefix, char* basename)
-{
-    char* token = strrchr(path, (int) '/');
-    if(token == NULL)
+int listDir(char* path, char* output)
+{    
+    struct dirent* entry;
+    if(path == NULL || strlen(path) == 0)
     {
-        strcpy(prefix, "");
-        strcpy(basename, path);
-        return 1;
+        DIR* dirp = opendir(cwd);
+        while(entry = readdir(dirp))
+        {
+            strcat(output, "\n");
+            strcat(output, entry->d_name);
+            strcat(output, "\t");
+        }
+        return 0;
     }
-    strcpy(basename, token+1);
-    *token = '\0';
-    strcpy(prefix, path);
-    return 0;
+    char prefix[LEN], basename[LEN], destPath[2*LEN];
+    if(parsePath(path, prefix, basename) == 1)
+    {
+        strcpy(destPath, cwd);
+    }else{
+        if(strstr(prefix, root) == NULL)
+            return -1;
+        strcpy(destPath, prefix);
+    }
+    strcat(destPath, "/");
+    strcat(destPath, basename);
+    struct stat s;
+    if(stat(destPath, &s) == -1)
+    {
+        return -2;
+    }
+    if(S_ISDIR(s.st_mode))
+    {
+        DIR* dirp = opendir(destPath);
+        while(entry = readdir(dirp))
+        {
+            strcat(output, "\n");
+            strcat(output, entry->d_name);
+            strcat(output, "\t");
+        }
+        return 0;
+    }
+    else
+        return -3;
 }
 
 int makeDir(char* path)
@@ -160,11 +177,51 @@ int changeDir(char* path)
         return -3;      //no such dir
 }
 
-int execute(const char* command, char* res, int len)
+int getFile(char* path, int cSock)
+{
+    printf("DEBUG:path->%s\n", path);
+    char prefix[LEN], basename[LEN], destPath[2*LEN];
+    if(parsePath(path, prefix, basename) == 1)
+        strcpy(destPath, cwd);
+    else
+    {
+        if(strstr(prefix, root) == NULL)
+            return -1;  //permission deined
+        strcpy(destPath, prefix);
+    }
+    strcat(destPath, "/");
+    strcat(destPath, basename);
+    struct stat s;
+    if(stat(destPath, &s) == -1)
+        return -2;
+    if(S_ISREG(s.st_mode))  //if is regular file, write to cSock
+    {
+        int size, fd;
+        char temp[LEN];
+        fd = open(destPath, O_RDONLY);
+        write(cSock, temp, 0);      //first zero byte to start transport
+        while(size = read(fd, temp, LEN))
+        {
+            if(size == -1)
+                return -2;  //sys error
+            else if(size == 0)
+            {
+                write(cSock, temp, size);   //zero byte to end transport
+                return 0;   //read/write done
+            }
+            else
+                write(cSock, temp, size);
+        }
+    }
+    else
+        return -3;      //no such file
+}
+
+int execute(const char* command, char* res, int len, int cSock)
 {
     char cmd[16], param[LEN];
+    memset(param, 0, LEN);
     parseCmd(command, cmd, param);
-    printf("command is [%s]\n", cmd);
     if(!strcmp(cmd, "pwd"))
     {
         strcpy(res, cwd);
@@ -207,6 +264,35 @@ int execute(const char* command, char* res, int len)
        printf("cwd:%s\n", cwd);
        return 0;
     }
+    if(!strcmp(cmd, "ls"))
+    {
+       int r = listDir(param, res);
+       if(r == -1)
+            strcpy(res, "permission deined!\n");
+       if(r == -2)
+            strcpy(res, strerror(errno));
+       if(r == -3)
+            strcpy(res, "No such dir\n"); 
+       printf("cwd:%s\n", cwd);
+       return 0;
+    }
+    if(!strcmp(cmd, "get"))
+    {
+       int r = getFile(param, cSock);
+       if(r == -1)
+            strcpy(res, "permission deined!\n");
+       if(r == -2)
+            strcpy(res, strerror(errno));
+       if(r == -3)
+            strcpy(res, "No such File\n"); 
+       if(r == 0)
+            strcpy(res, "success\n");
+      return 0; 
+    }
+    if(!strcmp(cmd, "put"))
+    {
+        //putFile(param);
+    }
     return -1;
 }
 
@@ -236,7 +322,7 @@ int main(int argc, char* argv[])
                break;
            }else
            {
-               if(execute(cmd, output, LEN) == 0)
+               if(execute(cmd, output, LEN, cSock) == 0)
                {
                    printf("execute result is: %s\n", output);
                    //write res to client
