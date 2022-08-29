@@ -45,15 +45,15 @@ int getFile(const char* cmd)
     printf("DEBUG:after parseCmd:cmd->%s\n", cmd);
     parsePath(p, prefix, basename);
     int n;
-    if(n = read(mySock,res,LEN))    //first zero byte to start
-        return -1;
-    int fd = open(basename, O_WRONLY);
+    //if(n = read(mySock,res,LEN))    //first zero byte to start
+    //    return -1;
+    int fd = open(basename, O_RDWR|O_CREAT, 0666);
     if(fd == -1)
         return -1;
     while(n = read(mySock, res, LEN))
     {
         write(fd, res, n);
-        printf("save %d bytes from server\n");
+        printf("save %d bytes from server\n", n);
     }
     close(fd);
     return 0;

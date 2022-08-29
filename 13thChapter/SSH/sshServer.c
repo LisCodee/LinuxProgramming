@@ -199,7 +199,7 @@ int getFile(char* path, int cSock)
         int size, fd;
         char temp[LEN];
         fd = open(destPath, O_RDONLY);
-        write(cSock, temp, 0);      //first zero byte to start transport
+        //write(cSock, temp, 0);      //first zero byte to start transport
         while(size = read(fd, temp, LEN))
         {
             if(size == -1)
@@ -286,8 +286,8 @@ int execute(const char* command, char* res, int len, int cSock)
        if(r == -3)
             strcpy(res, "No such File\n"); 
        if(r == 0)
-            strcpy(res, "success\n");
-      return 0; 
+            strcpy(res, "");
+       return 0; 
     }
     if(!strcmp(cmd, "put"))
     {
