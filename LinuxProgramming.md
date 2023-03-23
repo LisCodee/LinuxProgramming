@@ -81,13 +81,79 @@ vim有3种操作模式：
 
 在使用静态库时，链接器将所有必要的库函数代码和数据纳入a.out文件中，这使得a.out文件完整独立并且很大。在使用共享库时，库函数未包含在a.out文件中，但是对此类函数的调用以指令形式记录在a.out文件中。在执行动态链接的a.out文件时，操作系统a.out和共享库均加载到内存中。
 
+#### 静态链接库制作与链接
+
+```bash
+gcc -c xxx.c -o xxx.o   # compile xxx.c into xxx.o
+ar rcs libmylib.a xxx.o # crate static link library with xxx.o
+gcc -static main.c -L. -lmylib  # static compile-link main.c with libmylib.a as link library
+./a.out                 # run a.out as usual
+```
+在编译链接过程中，-L.指定链接库路径（当前目录），-l指定链接库，不要lib前缀
+
+#### 动态链接库制作与链接
+
+```bash
+gcc -c -fPIC xxx.c -o xxx.o             #compile to Position Independent Code xxx.o
+gcc -shared -o libmylib.so xxx.o        # craete shared libmylib.so with xxx.o
+gcc t.c -L. mylib                       # generate a.out using shared library libmylib.so
+export LD_LIBRARY_PATH=./               #to run a.out must export LD_LIBRARY_PATH=./
+a.out                                   # run a.out ld will load libmylib.so
+```
+用户也可以将链接库放入标准lib目录中，如/lib或/usr/lib，然后运行ldconfig配置动态链接库路径。具体man 8 ldconfig。
+
 ### 可执行文件格式
 
 **二进制可执行平面文件**：仅包含可执行代码和初始化数据。该文件将作为一个整体加载到内存中便于直接执行。比如可启动操作系统映像通常是二进制可执行平面文件，该文件简化了引导装载程序。
 
-**a.out可执行文件**：传统的a.out文件包含文件头，然后时代码段、数据段和bss段。
+**a.out可执行文件**：传统的a.out文件包含文件头，然后是代码段、数据段和bss段。
 
 **ELF可执行文件**：可执行的链接格式(ELF)文件包含一个或多个程序段。每个程序段均可加载至特定的内存地址。在Linux中为默认的二进制可执行文件，更适合动态链接。
+
+### a.out文件内容及执行流程
+
+a.out文件包含文件头、代码段、数据段和符号表。
+
+- 文件头：包含a.out文件的加载信息和大小，其中：
+    - tsize:代码段大小（正文段text）
+    - dsize:包含初始化全局变量和初始化静态局部变量的数据段大小
+    - bsize:包含未初始化全局变量和未初始化静态局部变量的bss段大小
+    - total_size:加载的a.out文件总大小
+- 代码段：包含程序的可执行代码。代码段从标准C启动代码crt0.o开始，该代码调用main函数
+- 数据段
+- 符号表：可选，仅为运行调试所需
+
+> 包含未初始化全局变量和未初始化局部变量的bss段不在a.out文件中，只有bss段的大小记录在a.out文件中，自动局部变量也不再a.out中。bss段上的额外的内存空间为堆区，用于执行期间的动态内存分配。
+
+#### 执行流程
+
+> a.out one two three
+
+为执行命令，sh创建一个子进程并等待该子进程终止。子进程运行时，sh使用a.out文件，按照以下步骤创建新的执行映像：
+
+1）读取a.out文件头，以确定所需的总内存大小，包括堆栈空间大小：
+
+$$TotalSize = \_brk + stackSize$$
+
+其中堆栈大小通常是操作系统内核为带启动程序选择的默认值。无法知道一个程序究竟需要多大的堆栈空间。
+
+2）sh从总大小中分配一个内存区给执行映像。 **从概念上讲，可以假设分配的内存区是一个单独连续的内存。** sh将a.out文件的代码段和数据段加载到内存区，堆栈区位于高地址端。ssh将bss段清0。执行期间，堆栈向下朝低位地址延申。
+
+3）然后，sh放弃旧映像，开始执行新映像。如下图
+
+![执行映像](img/memoryAllo.png)
+
+在上图中，bss段结束处的_brk为程序的初始"break"标记，_splimit为堆栈大小限度。首次加载a.out文件时，_brk可能和_splimit重合，初始堆大小为0。执行期间，进程可以使用brk（地址）或sbrk（大小）系统调用将_brk改到更高地址从而增加堆大小。malloc()可隐式调用。
+
+如果程序试图扩展splimit下面的堆栈指针，就会发生堆栈溢出。在有内存保护的机器上，内存管理硬件将检测到，然后将进程捕捉到操作系统内核，操作系统内核可能会通过在进程地址空间中分配额外的内存来增加堆栈，从而允许继续执行。
+
+4）执行从crt0.o开始，调用main，将argc和argv作为参数传递给main。
+
+#### 程序终止
+
+1） **正常终止**：如果程序执行成功，main最终会返回到crt0.o，调用库函数exit(0)终止进程。首先，exit(value)函数会做一些清理工作，如刷新stdout，关闭I/O流。然后发出一个_exit(value)系统调用，时进入操作系统内核的进程终止。或者直接调用_exit()，然后将清理工作交给父进程。
+
+2） **异常终止**：如果进程遇到了某些错误：无效地址、非法指令、越权等，会被CPU识别为异常，然后陷入操作系统内核，内核的陷入处理程序将错误类型转换为一个幻数，称为 **信号**，将信号传递给该进程，使进程终止。
 
 ## 2.1 汇编和C
 
@@ -204,7 +270,7 @@ myt:$(OBJS)
 **子目录的makefile**
 
 ```makefile
-(cd DIR;$(MAKE)) or cd DI
+(cd DIR;$(MAKE)) or cd DIR && $(MAKE)
 ```
 
 # 第三章 进程管理
