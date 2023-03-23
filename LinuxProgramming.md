@@ -1,4 +1,93 @@
+# 第一章 Linux基础
+
+## 1.1 Unix/Linux文件系统的组织
+
+Unix/Linux将所有能够存储或者提供信息的事物都视为文件，从一般意义上说，文件系统树的每个节点都是一个"FILE"。有以下类型：
+
+- 目录文件
+- 非目录文件：非目录文件要么是REGULAR（常规文件）要么是SPECIAL，可进一步分为
+    - 常规文件：ORDINARY文件，包含普通文本或者可执行的二进制代码
+    - 特殊文件：/dev目录中的条目，表示I/O设备，可进一步分为：
+        - 字符特殊文件：字符I/O， 如/dev/tty0, /dev/pts/1等
+        - 块特殊文件:块I/O， 如/dev/had, /dev/sda等
+        - 其他类型,如网络（套接字）特殊文件、命名管道等。
+- 符号连接文件：输入常规文件，其内容为其他文件的路径名。因此这些文件是指向其他文件的指针。
+
+## 1.2 Linux man
+
+在linux中可以通过命令man来查看相关命令和系统调用。man man可以查看手册的目录。
+
+1.   Executable programs or shell commands
+2.   System calls (functions provided by the kernel)
+3.   Library calls (functions within program libraries)
+4.  Special files (usually found in /dev)
+5.   File formats and conventions eg /etc/passwd
+6.   Games
+7.   Miscellaneous (including macro packages and conventions), e.g. man(7), groff(7)
+8.   System administration commands (usually only for root)
+9.   Kernel routines [Non standard]
+
+## 1.3 Ubuntu Linux系统管理
+
+### 1.3.1 用户账户
+
+用户账户信息保存在/etc/passwd文件中，归超级用户所有，但所有人都可以读取。在表单的/etc/passwd文件中，每个用户都有一个对应的记录行：
+
+> loginName:x:gid:uid:useinfo:homeDir:initialProgram   
+ljx:x:1000:1000:ljx:/home/ljx:/bin/bash
+
+其中第二个字段'x'表示检查用户密码。加密的用户密码保存在 **/etc/shadow** 文件中。每一行都包含加密的用户密码，后面是可选的过期限制信息。  
+当用户尝试使用用户名和密码登录时，Linux将检查/etc/passwd和/etc/shadow文件来验证用户身份。**用户登录成功后，登陆进程将通过获取用户的gid和uid来转换成用户进程，并将目录更改为用户的homeDir，然后执行列出的initialProgram，该程序通常为命令解释程序sh。** 
+
+> sudo adduser username
+
+#### sudo命令
+
+sudo允许用户以另一个用户的身份执行命令。在执行命令时将用户进程提升到超级用户特权级别，执行完后恢复。为确保能够使用sudo， **用户名必须保存在/etc/sudoer文件中。为确保用户能够发出sodu，只需要在sudoers文件中添加 username ALL(ALL) ALL。**
+
 # 第二章 编程背景
+
+## vim
+
+vim有3种操作模式：
+
+- 命令模式
+- 插入模式
+- 末行模式
+
+> 在命令模式下输入i/a进入插入模式。输入":"进入末行模式。
+
+## 前言
+
+### 编译流程
+
+1. 预处理
+2. 编译：将源代码编译成汇编代码，生成.s文件
+3. 汇编：将汇编代码生成机器码，生成.o文件。每个.o文件都包含：
+    - 一个文件头，包含代码段、数据段和BSS段大小
+    - 一个代码段，包含机器指令
+    - 一个数据段，包含初始化全局变量和初始化静态局部变量
+    - 一个BSS段，包含未初始化全局变量和未初始化静态局部变量
+    - 代码中的指针以及数据和BSS中的偏移量的重定位信息
+    - 一个符号表，包含非静态全局变量、函数名称以及其属性
+4. 链接：将所有的.o文件和必要的库函数组合成单一的二进制可执行文件。具体执行以下操作：
+    - 将.o文件所有代码段组合成单一代码段。 **对于C语言程序，组合代码段从默认的C启动代码crt0.o开始，该代码调用main()函数。这就是为什么C语言程序必须有一个唯一的main()函数。**
+    - 将所有数据段组合成单一数据段。仅包含初始化全局变量和初始化静态局部变量
+    - 将所有BSS段组合成单一bss段
+    - 用.o文件中重定位信息调整组合代码段中的指针以及组合数据段、bss段中的偏移量
+    - 用符号表解析各个.o文件之间的交叉引用。
+
+### 静态与动态链接
+
+在使用静态库时，链接器将所有必要的库函数代码和数据纳入a.out文件中，这使得a.out文件完整独立并且很大。在使用共享库时，库函数未包含在a.out文件中，但是对此类函数的调用以指令形式记录在a.out文件中。在执行动态链接的a.out文件时，操作系统a.out和共享库均加载到内存中。
+
+### 可执行文件格式
+
+**二进制可执行平面文件**：仅包含可执行代码和初始化数据。该文件将作为一个整体加载到内存中便于直接执行。比如可启动操作系统映像通常是二进制可执行平面文件，该文件简化了引导装载程序。
+
+**a.out可执行文件**：传统的a.out文件包含文件头，然后时代码段、数据段和bss段。
+
+**ELF可执行文件**：可执行的链接格式(ELF)文件包含一个或多个程序段。每个程序段均可加载至特定的内存地址。在Linux中为默认的二进制可执行文件，更适合动态链接。
 
 ## 2.1 汇编和C
 
