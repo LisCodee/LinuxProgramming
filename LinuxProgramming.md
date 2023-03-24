@@ -326,9 +326,9 @@ PROC *child, *sibling, *parent;
 
 ### 3.1.5 进程执行模式
 
-进程以两种不同的模式执行，即内核模式和用户模式，简称Kmode和Umode。在进程生命周期中，会在Kmode和Umode间多次迁移，在Kmode下执行所有相关操作，包括终止。在Kmode模式下，可以通过将CPU寄存机从K模式更改为U模式切换到Umode，但是从Umode进入Kmode只能通过以下三种方法：
+进程以两种不同的模式执行，即内核模式和用户模式，简称Kmode和Umode。在进程生命周期中，会在Kmode和Umode间多次迁移，在Kmode下执行所有相关操作，包括终止。在Kmode模式下，可以通过将CPU状态寄存器从K模式更改为U模式切换到Umode，但是从Umode进入Kmode只能通过以下三种方法：
 
-- 中断
+- 中断：外部设备发信号给CPU，请求CPU服务。
 - Trap：无效地址、非法指令、除零等。在Linux中，内核陷阱处理程序将陷阱原因转化为信号编号，并将信号传递给进程。对于多数信号进程的默认操作是终止。
 - 系统调用
 
@@ -342,13 +342,13 @@ int pid = fork()
 
 fork()创建子进程并返回pid。在Linux中，每个用户在同一时间只能有数量有限的进程，用户资源限制可以再/etc/security/limits.conf文件中设置，可以用ulimit -a查看资源限制。
 
-**kfork()允许子进程继承父进程打开的所有文件。**在fork后子进程和系统中其他进程争夺CPU，在Linux中以下系统调用可能影响进程执行顺序：
+**kfork()允许子进程继承父进程打开的所有文件。** 在fork后子进程和系统中其他进程争夺CPU，在Linux中以下系统调用可能影响进程执行顺序：
 
 - sleep
 - nice(int inc):将进程优先级增大一个指定值，这回降低进程调度优先级（优先值越大优先级越低）。在非抢占式内核中，进程切换可能不会立即发生，只在执行进程返回Umode时发生
 - sched_yield(void):使调用进程放弃cpu，允许优先级更高的其他进程先运行。但是如果调用进程仍然具有最高优先级，它将继续运行。
 
-**Linux系统有一个vfork()系统调用，比fork()更有效。The use of vfork() was tricky: for example, not modifying data in the parent process depended on knowing which variables were held in a register.**就是说fork()会父进程使用的空间都复制一份给子进程使用，但对于很多子进程来说都是直接调用exec然后结束，vfork()并不会复制父进程的空间来使用，而是直接使用父进程的空间，在子进程执行期间父进程被挂起。
+**Linux系统有一个vfork()系统调用，比fork()更有效。The use of vfork() was tricky: for example, not modifying data in the parent process depended on knowing which variables were held in a register.** 就是说fork()会父进程使用的空间都复制一份给子进程使用，但对于很多子进程来说都是直接调用exec然后结束，vfork()并不会复制父进程的空间来使用，而是直接使用父进程的空间，在子进程执行期间父进程被挂起。
 
 > DESCRIPTION
 >    Standard description
@@ -448,7 +448,7 @@ scanf("%s", &item)
 printf("%s\n", items)
 ```
 
-执行以上库函数时，会试图将数据写入stdout文件FILE结构体的fbuf[]，这是缓冲行，如果fbuf有一个完整的行，他会发出一个write的系统调用，将数据从fbuf写入文件描述符1，映射到终端屏幕。、
+执行以上库函数时，会试图将数据写入stdout文件FILE结构体的fbuf[]，这是缓冲行，如果fbuf有一个完整的行，他会发出一个write的系统调用，将数据从fbuf写入文件描述符1，映射到终端屏幕。
 
 ## 3.3 管道
 
@@ -468,7 +468,7 @@ printf("%s\n", items)
    int pipe2(int pipefd[2], int flags);
 ```
 
-以上系统调用在内核中创建一个管道，并在pd[2]中返回2个文件描述符。其中pd[0]用于读管道数据，pd[1]用于向管道写数据。管道并非为单进程而创建。
+以上系统调用在内核中创建一个管道，并在pd[2]中返回2个文件描述符。其中pd[0]用于读管道数据，pd[1]用于向管道写数据。管道并非为单进程而创建。每个进程只能扮演一个管道中的一个角色，要么读，要么写。
 
 ### 3.3.2 管道命令处理
 

@@ -21,11 +21,12 @@ int main(){
         printf("child=%d parent=%d\n", getpid(), getppid());
         pid = fork();
         if(pid){
+            sleep(1);
             printf("child=%d start: grandchild=%d\n", getpid(), pid);
             printf("child=%d EXIT: grandchild=%d\n", getpid(), pid);
         }
         else{
-            sleep(1);
+            // sleep(1);
             printf("grandchild=%d start: myparent=%d\n", getpid(), getppid());
             printf("grandchild=%d EXIT: myparent=%d\n", getpid(), getppid());
         }
